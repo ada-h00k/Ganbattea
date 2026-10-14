@@ -1,0 +1,71 @@
+name: Build & Release
+
+# Every push to main builds the Linux binary, packs it together with the
+# installer into a .tar.gz and publishes it as a new GitHub release.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  VERSION: v0.1.${{ github.run_number }}
+
+jobs:
+  release:
+    name: Build & publish (Linux)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libasound2-dev \
+            qtbase5-dev qtdeclarative5-dev \
+            qml-module-qtquick2 qml-module-qtquick-window2 qml-module-qtquick-layouts
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build
+        run: cargo build --release
+
+      - name: Package archive
+        run: |
+          NAME="ganbattea-${VERSION}-linux-x86_64"
+          mkdir -p "dist/${NAME}"
+          cp target/release/ganbattea "dist/${NAME}/"
+          cp packaging/install.sh packaging/ganbattea.svg packaging/README.txt "dist/${NAME}/"
+          chmod 755 "dist/${NAME}/ganbattea" "dist/${NAME}/install.sh"
+          tar -C dist -czf "${NAME}.tar.gz" "${NAME}"
+          echo "ARCHIVE=${NAME}.tar.gz" >> "$GITHUB_ENV"
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.VERSION }}
+          target_commitish: ${{ github.sha }}
+          name: Ganbattea ${{ env.VERSION }}
+          generate_release_notes: true
+          body: |
+            Automated build of commit `${{ github.sha }}`.
+
+            **Install (Linux x86_64):**
+
+            ```
+            tar xzf ganbattea-${{ env.VERSION }}-linux-x86_64.tar.gz
+            cd ganbattea-${{ env.VERSION }}-linux-x86_64
+            ./install.sh
+            ```
+
+            This installs the binary to `~/.local/bin`, adds Ganbattea to your start menu and
+            installs the icon. Requires Qt 5.15 (Qt Quick) and ALSA/PulseAudio – see `README.txt`
+            in the archive for the packages on your distribution.
+          files: ${{ env.ARCHIVE }}
