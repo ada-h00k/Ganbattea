@@ -2,10 +2,8 @@
 
 **Ganbattea** is a desktop timekeeping application built with Rust and Qt 6 / Qt Quick. It brings a countdown timer, a stopwatch, and daily alarms together in one focused interface.
 
-[![Build and publish Flatpak](https://github.com/OWNER/REPOSITORY/actions/workflows/flatpak-release.yml/badge.svg)](https://github.com/OWNER/REPOSITORY/actions/workflows/flatpak-release.yml)
+[![Build and publish Flatpak](https://github.com/ada-h00k/Ganbattea/actions/workflows/flatpak-release.yml/badge.svg)](https://github.com/ada-h00k/Ganbattea/actions/workflows/flatpak-release.yml)
 [![License: AGPL-3.0-only](https://img.shields.io/badge/license-AGPL--3.0--only-blue.svg)](LICENSE)
-
-> Replace `OWNER/REPOSITORY` in the build badge after creating the GitHub repository.
 
 ## Features
 
@@ -68,7 +66,7 @@ After the GitHub Actions workflow has completed and GitHub Pages has been enable
 
 ```bash
 flatpak remote-add --user --if-not-exists --no-gpg-verify ganbattea \
-  https://OWNER.github.io/REPOSITORY/repo
+  https://ada-h00k.github.io/Ganbattea/repo
 flatpak install --user ganbattea de.ganbattea.app
 ```
 
@@ -76,11 +74,9 @@ The example above is for the unsigned repository fallback. For a signed reposito
 
 ```bash
 flatpak remote-add --user --if-not-exists ganbattea \
-  https://OWNER.github.io/REPOSITORY/ganbattea.flatpakrepo
+  https://ada-h00k.github.io/Ganbattea/ganbattea.flatpakrepo
 flatpak install --user ganbattea de.ganbattea.app
 ```
-
-Replace `OWNER` and `REPOSITORY` with the GitHub account or organization and repository name.
 
 You can also download the `.flatpak` bundle attached to any automated GitHub commit release and install it directly:
 
@@ -131,10 +127,12 @@ On every push to `main` or `master`, it:
 
 For the first deployment:
 
+> **Private repository note:** This repository is currently private. GitHub Pages is available for private repositories on GitHub Pro, Team, and Enterprise; GitHub Free requires a public repository. The published Pages site is public, even when its source repository is private. Do not place private files in the Pages artifact.
+
 1. Push the project to a GitHub repository using `main` or `master` as the default branch.
 2. Open **Settings → Pages** and set **Build and deployment → Source** to **GitHub Actions**.
 3. Open **Settings → Actions → General → Workflow permissions** and allow the workflow to write repository contents. The workflow declares its required permissions explicitly; the `GITHUB_TOKEN` must be allowed to create releases.
-4. Push a commit. The workflow will build and publish the Flatpak. GitHub Pages will host the repository at `https://OWNER.github.io/REPOSITORY/`.
+4. Push a commit. The workflow will build and publish the Flatpak. GitHub Pages will host the repository at `https://ada-h00k.github.io/Ganbattea/`.
 
 ### Recommended: sign the Flatpak repository
 

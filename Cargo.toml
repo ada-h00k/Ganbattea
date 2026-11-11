@@ -1,9 +1,12 @@
 [package]
 name = "ganbattea"
 version = "0.1.0"
+authors = ["ada-h00k"]
 edition = "2021"
-description = "Timer, Stoppuhr und Wecker mit Rust und Qt Quick"
-license = "MIT"
+description = "A timer, stopwatch, and alarm clock built with Rust and Qt Quick"
+homepage = "https://github.com/ada-h00k/Ganbattea"
+repository = "https://github.com/ada-h00k/Ganbattea"
+license = "AGPL-3.0-only"
 build = "build.rs"
 
 [dependencies]

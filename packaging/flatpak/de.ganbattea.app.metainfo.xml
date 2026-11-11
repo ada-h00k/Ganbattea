@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>de.ganbattea.app</id>
+  <name>Ganbattea</name>
+  <summary>A focused timer, stopwatch, and alarm clock</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>AGPL-3.0-only</project_license>
+  <developer id="ada-h00k">
+    <name>ada-h00k</name>
+  </developer>
+  <url type="homepage">https://github.com/ada-h00k/Ganbattea</url>
+  <url type="bugtracker">https://github.com/ada-h00k/Ganbattea/issues</url>
+  <url type="vcs-browser">https://github.com/ada-h00k/Ganbattea</url>
+  <description>
+    <p>Ganbattea brings a countdown timer, a stopwatch with lap recording, and daily alarms together in one desktop application.</p>
+  </description>
+  <launchable type="desktop-id">de.ganbattea.app.desktop</launchable>
+  <releases>
+    <release version="0.1.0" date="2026-11-11" />
+  </releases>
+  <content_rating type="oars-1.1" />
+</component>

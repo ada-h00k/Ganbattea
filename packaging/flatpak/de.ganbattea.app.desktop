@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Ganbattea
+GenericName=Timer and Alarm Clock
+Comment=Countdown timer, stopwatch, and daily alarms
+Exec=ganbattea
+Icon=de.ganbattea.app
+Terminal=false
+Categories=Utility;Clock;
+StartupNotify=true
