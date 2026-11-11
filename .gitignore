@@ -1,4 +1,4 @@
 /target
-Cargo.lock
 *.user
 .DS_Store
+packaging/flatpak/cargo-sources.json
