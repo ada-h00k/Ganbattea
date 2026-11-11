@@ -172,11 +172,11 @@ impl AlarmManager {
 
     pub fn add(&mut self, hour: i32, minute: i32, label: String) -> Result<(), String> {
         if !(0..=23).contains(&hour) || !(0..=59).contains(&minute) {
-            return Err("Bitte eine gültige Uhrzeit wählen.".to_owned());
+            return Err("Please choose a valid time.".to_owned());
         }
 
         let label = label.trim();
-        let label = if label.is_empty() { "Wecker" } else { label };
+        let label = if label.is_empty() { "Alarm" } else { label };
         let alarm = Alarm {
             id: self.next_id,
             hour: hour as u32,
@@ -194,7 +194,7 @@ impl AlarmManager {
         let alarm = self
             .alarms
             .get_mut(index)
-            .ok_or_else(|| "Der ausgewählte Wecker existiert nicht mehr.".to_owned())?;
+            .ok_or_else(|| "The selected alarm no longer exists.".to_owned())?;
         alarm.enabled = enabled;
         if enabled {
             alarm.last_fired_date = None;
@@ -204,7 +204,7 @@ impl AlarmManager {
 
     pub fn remove(&mut self, index: usize) -> Result<(), String> {
         if index >= self.alarms.len() {
-            return Err("Der ausgewählte Wecker existiert nicht mehr.".to_owned());
+            return Err("The selected alarm no longer exists.".to_owned());
         }
         self.alarms.remove(index);
         self.save()
@@ -231,22 +231,22 @@ impl AlarmManager {
 
     fn save(&self) -> Result<(), String> {
         let Some(path) = data_file() else {
-            return Err("Kein Benutzer-Datenverzeichnis gefunden; Wecker konnten nicht gespeichert werden.".to_owned());
+            return Err("No user data directory found; alarms could not be saved.".to_owned());
         };
         let parent = path
             .parent()
-            .ok_or_else(|| "Ungültiger Speicherpfad für Wecker.".to_owned())?;
+            .ok_or_else(|| "Invalid storage path for alarms.".to_owned())?;
         fs::create_dir_all(parent)
-            .map_err(|error| format!("Wecker konnten nicht gespeichert werden: {error}"))?;
+            .map_err(|error| format!("Could not save alarms: {error}"))?;
 
         let data = serde_json::to_vec_pretty(&self.alarms)
-            .map_err(|error| format!("Wecker konnten nicht serialisiert werden: {error}"))?;
+            .map_err(|error| format!("Could not serialize alarms: {error}"))?;
         let mut temporary = path.clone();
         temporary.set_extension("json.tmp");
         fs::write(&temporary, data)
-            .map_err(|error| format!("Wecker konnten nicht geschrieben werden: {error}"))?;
+            .map_err(|error| format!("Could not write alarms: {error}"))?;
         fs::rename(&temporary, &path)
-            .map_err(|error| format!("Wecker konnten nicht übernommen werden: {error}"))?;
+            .map_err(|error| format!("Could not finalize the alarms file: {error}"))?;
         Ok(())
     }
 }

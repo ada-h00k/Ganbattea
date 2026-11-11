@@ -11,7 +11,7 @@ ApplicationWindow {
     minimumWidth: 760
     minimumHeight: 650
     visible: true
-    title: "Ganbattea – Zeit im Griff"
+    title: "Ganbattea – Take Control of Your Time"
     color: "#0B1020"
 
     property int selectedPage: 0
@@ -65,7 +65,7 @@ ApplicationWindow {
         x: (root.width - width) / 2
         y: (root.height - height) / 2
         modal: true
-        title: "Ganbattea – Erinnerung"
+        title: "Ganbattea – Alarm"
         standardButtons: Dialog.Ok
         width: 380
         onClosed: alarmSound.stop()
@@ -166,7 +166,7 @@ ApplicationWindow {
                         Layout.alignment: Qt.AlignHCenter
                     }
                     Text {
-                        text: Qt.formatDate(new Date(), "dddd, d. MMMM")
+                        text: new Date().toLocaleDateString(Qt.locale("en_GB"), "dddd, d MMMM")
                         color: "#74839F"
                         font.pixelSize: 10
                         Layout.alignment: Qt.AlignHCenter
@@ -179,7 +179,7 @@ ApplicationWindow {
             Layout.fillWidth: true
             spacing: 10
             Repeater {
-                model: ["Timer", "Stoppuhr", "Wecker"]
+                model: ["Timer", "Stopwatch", "Alarms"]
                 delegate: Button {
                     required property int index
                     required property string modelData
@@ -266,7 +266,7 @@ ApplicationWindow {
                         }
                         Item { Layout.fillWidth: true }
                         Text {
-                            text: controller.timerRunning ? "● LÄUFT" : "○ BEREIT"
+                            text: controller.timerRunning ? "● RUNNING" : "○ READY"
                             color: controller.timerRunning ? "#9BE7D8" : "#8190AA"
                             font.pixelSize: 10
                             font.bold: true
@@ -295,7 +295,7 @@ ApplicationWindow {
                             anchors.centerIn: parent
                             spacing: 7
                             Text {
-                                text: "VERBLEIBENDE ZEIT"
+                                text: "TIME REMAINING"
                                 color: "#8198B1"
                                 font.pixelSize: 9
                                 font.letterSpacing: 1.7
@@ -310,7 +310,7 @@ ApplicationWindow {
                                 Layout.alignment: Qt.AlignHCenter
                             }
                             Text {
-                                text: "Ein Schritt nach dem anderen."
+                                text: "One step at a time."
                                 color: "#8C9CB5"
                                 font.pixelSize: 11
                                 Layout.alignment: Qt.AlignHCenter
@@ -363,7 +363,7 @@ ApplicationWindow {
                         }
                     }
                     Text {
-                        text: "Stunden     Minuten     Sekunden"
+                        text: "Hours     Minutes     Seconds"
                         color: "#73839E"
                         font.pixelSize: 10
                         Layout.alignment: Qt.AlignHCenter
@@ -402,7 +402,7 @@ ApplicationWindow {
                         Button {
                             Layout.preferredWidth: 112
                             Layout.preferredHeight: 48
-                            text: "Zurücksetzen"
+                            text: "Reset"
                             onClicked: {
                                 var h = parseInt(hoursInput.text) || 0
                                 var m = parseInt(minutesInput.text) || 0
@@ -434,20 +434,20 @@ ApplicationWindow {
                     anchors.margins: 26
                     spacing: 16
                     Text {
-                        text: "FOKUS-MODUS"
+                        text: "FOCUS MODE"
                         color: "#9BE7D8"
                         font.pixelSize: 11
                         font.bold: true
                         font.letterSpacing: 2
                     }
                     Text {
-                        text: "Mach dir\nZeit für das,\nwas zählt."
+                        text: "Make time\nfor what\nmatters."
                         color: "#F0F4FC"
                         font.pixelSize: 29
                         font.bold: true
                     }
                     Text {
-                        text: "Starte einen Countdown für deine nächste Aufgabe, eine Lernsession oder eine wohlverdiente Pause."
+                        text: "Start a countdown for your next task, study session, or a well-deserved break."
                         color: "#98A7BF"
                         font.pixelSize: 13
                         wrapMode: Text.WordWrap
@@ -458,21 +458,21 @@ ApplicationWindow {
                         Text { text: "◷"; color: "#9BE7D8"; font.pixelSize: 20 }
                         ColumnLayout {
                             spacing: 2
-                            Text { text: "Maximale Dauer"; color: "#DDE6F5"; font.pixelSize: 12; font.bold: true }
-                            Text { text: "Bis zu 7 Tage"; color: "#8292AB"; font.pixelSize: 11 }
+                            Text { text: "Maximum duration"; color: "#DDE6F5"; font.pixelSize: 12; font.bold: true }
+                            Text { text: "Up to 7 days"; color: "#8292AB"; font.pixelSize: 11 }
                         }
                     }
                     RowLayout {
                         Text { text: "↻"; color: "#9BE7D8"; font.pixelSize: 20 }
                         ColumnLayout {
                             spacing: 2
-                            Text { text: "Präzise Zeitmessung"; color: "#DDE6F5"; font.pixelSize: 12; font.bold: true }
-                            Text { text: "Monotone Rust-Zeitbasis"; color: "#8292AB"; font.pixelSize: 11 }
+                            Text { text: "Precision timekeeping"; color: "#DDE6F5"; font.pixelSize: 12; font.bold: true }
+                            Text { text: "Monotonic Rust clock"; color: "#8292AB"; font.pixelSize: 11 }
                         }
                     }
                     Item { Layout.fillHeight: true }
                     Text {
-                        text: "GANBATTE  —  Du schaffst das."
+                        text: "GANBATTE  —  You've got this."
                         color: "#A4E5D9"
                         font.pixelSize: 11
                         font.italic: true
@@ -498,7 +498,7 @@ ApplicationWindow {
                     anchors.margins: 34
                     spacing: 20
                     Text {
-                        text: "STOPPUHR"
+                        text: "STOPWATCH"
                         color: "#9BE7D8"
                         font.pixelSize: 11
                         font.bold: true
@@ -514,7 +514,7 @@ ApplicationWindow {
                         Layout.alignment: Qt.AlignHCenter
                     }
                     Text {
-                        text: controller.stopwatchRunning ? "ZEIT WIRD GEMESSEN" : "BEREIT"
+                        text: controller.stopwatchRunning ? "STOPWATCH RUNNING" : "BEREIT"
                         color: controller.stopwatchRunning ? "#9BE7D8" : "#8190AA"
                         font.pixelSize: 10
                         font.bold: true
@@ -536,7 +536,7 @@ ApplicationWindow {
                         Button {
                             Layout.preferredWidth: 112
                             Layout.preferredHeight: 50
-                            text: "Runde"
+                            text: "Lap"
                             enabled: controller.stopwatchRunning
                             onClicked: controller.lapStopwatch()
                             background: Rectangle { radius: 13; color: "#263650"; border.color: "#3B4D6B" }
@@ -567,7 +567,7 @@ ApplicationWindow {
                     spacing: 14
                     RowLayout {
                         Layout.fillWidth: true
-                        Text { text: "RUNDE / ZEIT"; color: "#9BE7D8"; font.pixelSize: 11; font.bold: true; font.letterSpacing: 1.7 }
+                        Text { text: "LAP / TIME"; color: "#9BE7D8"; font.pixelSize: 11; font.bold: true; font.letterSpacing: 1.7 }
                         Item { Layout.fillWidth: true }
                         Text { text: root.twoDigits(root.lapItems.length); color: "#8292AB"; font.pixelSize: 11 }
                     }
@@ -589,20 +589,20 @@ ApplicationWindow {
                                 anchors.fill: parent
                                 anchors.leftMargin: 12
                                 anchors.rightMargin: 12
-                                Text { text: "Runde " + root.twoDigits(root.lapItems.length - index); color: "#9BAAC0"; font.pixelSize: 12; Layout.fillWidth: true }
+                                Text { text: "Lap " + root.twoDigits(root.lapItems.length - index); color: "#9BAAC0"; font.pixelSize: 12; Layout.fillWidth: true }
                                 Text { text: modelData; color: "#E6EDF8"; font.family: "monospace"; font.pixelSize: 14; font.bold: true }
                             }
                         }
                         Text {
                             anchors.centerIn: parent
                             visible: root.lapItems.length === 0
-                            text: "Noch keine Runden gespeichert."
+                            text: "No laps recorded yet."
                             color: "#74849E"
                             font.pixelSize: 12
                         }
                     }
                     Text {
-                        text: "Tipp: Mit „Runde“ speicherst du Zwischenzeiten, ohne die Messung anzuhalten."
+                        text: "Tip: Select “Lap” to record split times without stopping the stopwatch."
                         color: "#8292AB"
                         font.pixelSize: 11
                         wrapMode: Text.WordWrap
@@ -629,19 +629,19 @@ ApplicationWindow {
                     anchors.margins: 28
                     spacing: 18
                     Text {
-                        text: "NEUEN WECKER ERSTELLEN"
+                        text: "CREATE NEW ALARM"
                         color: "#9BE7D8"
                         font.pixelSize: 11
                         font.bold: true
                         font.letterSpacing: 1.6
                     }
                     Text {
-                        text: "Dein nächster\nTermin mit dir selbst."
+                        text: "Your next appointment\nwith yourself."
                         color: "#F0F4FC"
                         font.pixelSize: 26
                         font.bold: true
                     }
-                    Text { text: "UHRZEIT"; color: "#91A1BA"; font.pixelSize: 10; font.bold: true; font.letterSpacing: 1.2 }
+                    Text { text: "TIME"; color: "#91A1BA"; font.pixelSize: 10; font.bold: true; font.letterSpacing: 1.2 }
                     RowLayout {
                         spacing: 10
                         SpinBox {
@@ -690,11 +690,11 @@ ApplicationWindow {
                             }
                         }
                     }
-                    Text { text: "BESCHREIBUNG"; color: "#91A1BA"; font.pixelSize: 10; font.bold: true; font.letterSpacing: 1.2 }
+                    Text { text: "LABEL"; color: "#91A1BA"; font.pixelSize: 10; font.bold: true; font.letterSpacing: 1.2 }
                     TextField {
                         id: alarmLabel
-                        text: "Aufstehen"
-                        placeholderText: "z. B. Meeting, Pause …"
+                        text: "Wake up"
+                        placeholderText: "e.g. Meeting, break …"
                         Layout.fillWidth: true
                         color: "#F4F7FF"
                         font.pixelSize: 13
@@ -703,7 +703,7 @@ ApplicationWindow {
                     Button {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 48
-                        text: "+  Wecker hinzufügen"
+                        text: "+  Add alarm"
                         onClicked: {
                             controller.addAlarm(alarmHour.value, alarmMinute.value, alarmLabel.text)
                             alarmLabel.text = ""
@@ -713,7 +713,7 @@ ApplicationWindow {
                     }
                     Item { Layout.fillHeight: true }
                     Text {
-                        text: "Wecker werden lokal gespeichert. Ganbattea muss zur Alarmzeit geöffnet sein."
+                        text: "Alarms are stored locally. Ganbattea must be open when an alarm is due."
                         color: "#8292AB"
                         font.pixelSize: 11
                         wrapMode: Text.WordWrap
@@ -735,7 +735,7 @@ ApplicationWindow {
                     spacing: 14
                     RowLayout {
                         Layout.fillWidth: true
-                        Text { text: "DEINE WECKER"; color: "#9BE7D8"; font.pixelSize: 11; font.bold: true; font.letterSpacing: 1.7 }
+                        Text { text: "YOUR ALARMS"; color: "#9BE7D8"; font.pixelSize: 11; font.bold: true; font.letterSpacing: 1.7 }
                         Item { Layout.fillWidth: true }
                         Text { text: root.twoDigits(root.alarmItems.length); color: "#8292AB"; font.pixelSize: 11 }
                     }
@@ -793,7 +793,7 @@ ApplicationWindow {
                         Text {
                             anchors.centerIn: parent
                             visible: root.alarmItems.length === 0
-                            text: "Noch keine Wecker angelegt.\nFüge links deinen ersten hinzu."
+                            text: "No alarms set yet.\nAdd your first one on the left."
                             color: "#74849E"
                             font.pixelSize: 12
                             horizontalAlignment: Text.AlignHCenter

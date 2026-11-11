@@ -96,7 +96,7 @@ impl Default for GanbatteaRust {
             stopwatch_running: false,
             stopwatch_laps_json: QString::from("[]"),
             alarms_json: QString::from(alarms_json),
-            status_message: QString::from("Bereit für deinen nächsten Fokusmoment."),
+            status_message: QString::from("Ready for your next moment of focus."),
             alarm_event: 0,
             alarm_event_text: QString::default(),
             timer: CountdownTimer::default(),
@@ -110,28 +110,28 @@ impl Default for GanbatteaRust {
 impl qobject::Ganbattea {
     pub fn set_timer(mut self: Pin<&mut Self>, total_seconds: i32) {
         if total_seconds <= 0 {
-            self.as_mut().set_status_message(QString::from("Bitte eine Dauer größer als 0 Sekunden eingeben."));
+            self.as_mut().set_status_message(QString::from("Please enter a duration greater than 0 seconds."));
             return;
         }
         self.as_mut().rust_mut().timer.set_seconds(total_seconds as u64);
         self.as_mut().refresh_timer();
-        self.set_status_message(QString::from("Timer ist eingestellt."));
+        self.set_status_message(QString::from("Timer is set."));
     }
 
     pub fn start_timer(mut self: Pin<&mut Self>) {
         let started = self.as_mut().rust_mut().timer.start();
         self.as_mut().refresh_timer();
         if started {
-            self.set_status_message(QString::from("Timer läuft. Bleib im Flow."));
+            self.set_status_message(QString::from("Timer running. Stay in the flow."));
         } else {
-            self.set_status_message(QString::from("Stelle zuerst eine neue Timer-Dauer ein."));
+            self.set_status_message(QString::from("Set a new timer duration first."));
         }
     }
 
     pub fn pause_timer(mut self: Pin<&mut Self>) {
         self.as_mut().rust_mut().timer.pause();
         self.as_mut().refresh_timer();
-        self.set_status_message(QString::from("Timer pausiert."));
+        self.set_status_message(QString::from("Timer paused."));
     }
 
     pub fn timer_tick(mut self: Pin<&mut Self>) {
@@ -139,23 +139,23 @@ impl qobject::Ganbattea {
         self.as_mut().refresh_timer();
         self.as_mut().refresh_stopwatch();
         if finished {
-            self.as_mut().set_status_message(QString::from("Zeit abgelaufen!"));
+            self.as_mut().set_status_message(QString::from("Time's up!"));
             let event = *self.alarm_event() + 1;
             self.as_mut().set_alarm_event(event);
-            self.as_mut().set_alarm_event_text(QString::from("Dein Timer ist abgelaufen."));
+            self.as_mut().set_alarm_event_text(QString::from("Your timer has finished."));
         }
     }
 
     pub fn start_stopwatch(mut self: Pin<&mut Self>) {
         self.as_mut().rust_mut().stopwatch.start();
         self.as_mut().refresh_stopwatch();
-        self.set_status_message(QString::from("Stoppuhr läuft."));
+        self.set_status_message(QString::from("Stopwatch running."));
     }
 
     pub fn pause_stopwatch(mut self: Pin<&mut Self>) {
         self.as_mut().rust_mut().stopwatch.pause();
         self.as_mut().refresh_stopwatch();
-        self.set_status_message(QString::from("Stoppuhr pausiert."));
+        self.set_status_message(QString::from("Stopwatch paused."));
     }
 
     pub fn reset_stopwatch(mut self: Pin<&mut Self>) {
@@ -164,7 +164,7 @@ impl qobject::Ganbattea {
         rust.stopwatch_laps.clear();
         self.as_mut().set_stopwatch_laps_json(QString::from("[]"));
         self.as_mut().refresh_stopwatch();
-        self.set_status_message(QString::from("Stoppuhr zurückgesetzt."));
+        self.set_status_message(QString::from("Stopwatch reset."));
     }
 
     pub fn lap_stopwatch(mut self: Pin<&mut Self>) {
@@ -175,7 +175,7 @@ impl qobject::Ganbattea {
             serde_json::to_string(&rust.stopwatch_laps).unwrap_or_else(|_| "[]".to_owned())
         };
         self.as_mut().set_stopwatch_laps_json(QString::from(json));
-        self.set_status_message(QString::from("Runde gespeichert."));
+        self.set_status_message(QString::from("Lap recorded."));
     }
 
     pub fn add_alarm(mut self: Pin<&mut Self>, hour: i32, minute: i32, label: &QString) {
@@ -190,32 +190,32 @@ impl qobject::Ganbattea {
         self.as_mut().set_alarms_json(QString::from(json));
         match message {
             Some(error) => self.set_status_message(QString::from(error)),
-            None => self.set_status_message(QString::from("Wecker gespeichert.")),
+            None => self.set_status_message(QString::from("Alarm saved.")),
         }
     }
 
     pub fn toggle_alarm(mut self: Pin<&mut Self>, index: i32, enabled: bool) {
         let result = if index < 0 {
-            Err("Ungültiger Wecker-Eintrag.".to_owned())
+            Err("Invalid alarm entry.".to_owned())
         } else {
             self.as_mut().rust_mut().alarms.toggle(index as usize, enabled)
         };
         self.as_mut().refresh_alarms();
         match result {
-            Ok(()) => self.set_status_message(QString::from("Wecker aktualisiert.")),
+            Ok(()) => self.set_status_message(QString::from("Alarm updated.")),
             Err(error) => self.set_status_message(QString::from(error)),
         }
     }
 
     pub fn remove_alarm(mut self: Pin<&mut Self>, index: i32) {
         let result = if index < 0 {
-            Err("Ungültiger Wecker-Eintrag.".to_owned())
+            Err("Invalid alarm entry.".to_owned())
         } else {
             self.as_mut().rust_mut().alarms.remove(index as usize)
         };
         self.as_mut().refresh_alarms();
         match result {
-            Ok(()) => self.set_status_message(QString::from("Wecker gelöscht.")),
+            Ok(()) => self.set_status_message(QString::from("Alarm deleted.")),
             Err(error) => self.set_status_message(QString::from(error)),
         }
     }
@@ -225,9 +225,9 @@ impl qobject::Ganbattea {
         if !due.is_empty() {
             let text = due.join(", ");
             let event = *self.alarm_event() + 1;
-            self.as_mut().set_alarm_event_text(QString::from(format!("Zeit für: {text}")));
+            self.as_mut().set_alarm_event_text(QString::from(format!("Time for: {text}")));
             self.as_mut().set_alarm_event(event);
-            self.set_status_message(QString::from("Ein Wecker ist fällig."));
+            self.set_status_message(QString::from("An alarm is due."));
         }
     }
 
