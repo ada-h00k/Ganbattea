@@ -1,4 +1,4 @@
-use crate::clockwork::{AlarmManager, CountdownTimer, Stopwatch};
+use crate::clockwork::{systemd_supported, AlarmManager, CountdownTimer, Stopwatch};
 use chrono::Local;
 use cxx_qt::CxxQtType;
 use core::pin::Pin;
@@ -24,6 +24,8 @@ pub mod qobject {
         #[qproperty(QString, status_message, cxx_name = "statusMessage")]
         #[qproperty(i32, alarm_event, cxx_name = "alarmEvent")]
         #[qproperty(QString, alarm_event_text, cxx_name = "alarmEventText")]
+        #[qproperty(bool, systemd_alarms_enabled, cxx_name = "systemdAlarmsEnabled")]
+        #[qproperty(bool, alarm_launch, cxx_name = "alarmLaunch")]
         type Ganbattea = super::GanbatteaRust;
 
         #[qinvokable]
@@ -78,16 +80,42 @@ pub struct GanbatteaRust {
     status_message: QString,
     alarm_event: i32,
     alarm_event_text: QString,
+    systemd_alarms_enabled: bool,
+    alarm_launch: bool,
     timer: CountdownTimer,
     stopwatch: Stopwatch,
     stopwatch_laps: Vec<String>,
     alarms: AlarmManager,
 }
 
+fn alarm_trigger_id_from_args() -> Option<u64> {
+    let mut args = std::env::args().skip(1);
+    while let Some(argument) = args.next() {
+        if argument == "--alarm-trigger" {
+            return args.next().and_then(|value| value.parse::<u64>().ok());
+        }
+    }
+    None
+}
+
 impl Default for GanbatteaRust {
     fn default() -> Self {
         let alarms = AlarmManager::load();
+        let systemd_result = alarms.sync_systemd_timers();
+        let systemd_alarms_enabled = systemd_supported() && systemd_result.is_ok();
+        let status_message = match systemd_result {
+            Ok(()) => "Ready for your next moment of focus.".to_owned(),
+            Err(error) => format!("Systemd alarm scheduling unavailable: {error}"),
+        };
+        let alarm_trigger_id = alarm_trigger_id_from_args();
+        let alarm_event_text = alarm_trigger_id
+            .map(|id| {
+                let label = alarms.label_for_id(id).unwrap_or("Alarm");
+                format!("Time for: {label}")
+            })
+            .unwrap_or_default();
         let alarms_json = serde_json::to_string(alarms.alarms()).unwrap_or_else(|_| "[]".to_owned());
+
         Self {
             timer_display: QString::from("00:00:00"),
             timer_running: false,
@@ -96,9 +124,11 @@ impl Default for GanbatteaRust {
             stopwatch_running: false,
             stopwatch_laps_json: QString::from("[]"),
             alarms_json: QString::from(alarms_json),
-            status_message: QString::from("Ready for your next moment of focus."),
-            alarm_event: 0,
-            alarm_event_text: QString::default(),
+            status_message: QString::from(status_message),
+            alarm_event: if alarm_trigger_id.is_some() { 1 } else { 0 },
+            alarm_event_text: QString::from(alarm_event_text),
+            systemd_alarms_enabled,
+            alarm_launch: alarm_trigger_id.is_some(),
             timer: CountdownTimer::default(),
             stopwatch: Stopwatch::default(),
             stopwatch_laps: Vec::new(),
@@ -180,6 +210,9 @@ impl qobject::Ganbattea {
 
     pub fn add_alarm(mut self: Pin<&mut Self>, hour: i32, minute: i32, label: &QString) {
         let result = self.as_mut().rust_mut().alarms.add(hour, minute, label.to_string());
+        if result.is_err() {
+            self.as_mut().set_systemd_alarms_enabled(false);
+        }
         let (json, message) = {
             let rust = self.as_mut().rust_mut();
             (
@@ -190,7 +223,7 @@ impl qobject::Ganbattea {
         self.as_mut().set_alarms_json(QString::from(json));
         match message {
             Some(error) => self.set_status_message(QString::from(error)),
-            None => self.set_status_message(QString::from("Alarm saved.")),
+            None => self.set_status_message(QString::from("Alarm saved and scheduled.")),
         }
     }
 
@@ -200,6 +233,9 @@ impl qobject::Ganbattea {
         } else {
             self.as_mut().rust_mut().alarms.toggle(index as usize, enabled)
         };
+        if result.is_err() {
+            self.as_mut().set_systemd_alarms_enabled(false);
+        }
         self.as_mut().refresh_alarms();
         match result {
             Ok(()) => self.set_status_message(QString::from("Alarm updated.")),
@@ -213,6 +249,9 @@ impl qobject::Ganbattea {
         } else {
             self.as_mut().rust_mut().alarms.remove(index as usize)
         };
+        if result.is_err() {
+            self.as_mut().set_systemd_alarms_enabled(false);
+        }
         self.as_mut().refresh_alarms();
         match result {
             Ok(()) => self.set_status_message(QString::from("Alarm deleted.")),

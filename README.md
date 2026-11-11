@@ -13,7 +13,7 @@
 - **Local persistence** — alarm definitions are stored as JSON in the user's application data directory.
 - **Alarm notification** — an in-app notification and repeating sound are triggered when a timer or alarm expires.
 
-Ganbattea is a regular desktop application. Timers and alarms run while the application and operating system are running. The application cannot wake a computer that is powered off or suspended.
+On Linux, daily alarms are registered as persistent systemd user timers and continue to run when Ganbattea is closed. When an alarm is due, a systemd service launches Ganbattea with the alarm ID, and the app opens the alarm dialog and plays its sound. The user session must be active for the alarm to appear. If the computer is suspended, the calendar timer is handled after resume; Ganbattea does not wake a suspended or powered-off computer. On platforms without systemd, alarms are checked while the app is open.
 
 ## Technology
 

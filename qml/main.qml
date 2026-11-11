@@ -41,7 +41,8 @@ ApplicationWindow {
         triggeredOnStart: true
         onTriggered: {
             root.currentTime = Qt.formatTime(new Date(), "HH:mm:ss")
-            controller.checkAlarms()
+            if (!controller.systemdAlarmsEnabled && !controller.alarmLaunch)
+                controller.checkAlarms()
         }
     }
 
@@ -55,6 +56,13 @@ ApplicationWindow {
     Connections {
         target: controller
         function onAlarmEventChanged() {
+            alarmDialog.open()
+            alarmSound.play()
+        }
+    }
+
+    Component.onCompleted: {
+        if (controller.alarmLaunch && controller.alarmEvent > 0) {
             alarmDialog.open()
             alarmSound.play()
         }
@@ -713,7 +721,9 @@ ApplicationWindow {
                     }
                     Item { Layout.fillHeight: true }
                     Text {
-                        text: "Alarms are stored locally. Ganbattea must be open when an alarm is due."
+                        text: controller.systemdAlarmsEnabled
+                              ? "Scheduled with systemd. Ganbattea can be closed while your user session is active."
+                              : "Systemd user timers are unavailable. Keep Ganbattea open for alarms."
                         color: "#8292AB"
                         font.pixelSize: 11
                         wrapMode: Text.WordWrap
