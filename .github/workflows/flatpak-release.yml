@@ -166,12 +166,13 @@ jobs:
 
           echo "bundle=$bundle" >> "$GITHUB_OUTPUT"
 
-      - name: Create GitHub release for this commit
+      - name: Create draft GitHub release and upload assets
         uses: softprops/action-gh-release@v2
         with:
           tag_name: commit-${{ matrix.commit.sha }}
           target_commitish: ${{ matrix.commit.sha }}
           name: Ganbattea build ${{ matrix.commit.sha }}
+          draft: true
           prerelease: true
           make_latest: false
           generate_release_notes: false
@@ -183,6 +184,33 @@ jobs:
           files: |
             dist/Ganbattea-${{ matrix.commit.sha }}.flatpak
             dist/Ganbattea-${{ matrix.commit.sha }}.flatpakrepo
+
+      - name: Publish pre-release after all assets are uploaded
+        uses: actions/github-script@v7
+        env:
+          RELEASE_TAG: commit-${{ matrix.commit.sha }}
+        with:
+          script: |
+            const { data: release } = await github.rest.repos.getReleaseByTag({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag: process.env.RELEASE_TAG,
+            });
+
+            if (!release.draft) {
+              core.info(`Release is already published: ${release.html_url}`);
+              return;
+            }
+
+            const { data: published } = await github.rest.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: release.id,
+              draft: false,
+              prerelease: true,
+            });
+
+            core.info(`Published immutable pre-release: ${published.html_url}`);
 
       - name: Prepare GitHub Pages Flatpak repository for the pushed HEAD
         if: matrix.commit.is_tip
