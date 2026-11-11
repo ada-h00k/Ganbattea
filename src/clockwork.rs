@@ -170,6 +170,20 @@ impl AlarmManager {
         &self.alarms
     }
 
+    pub fn label_for_id(&self, id: u64) -> Option<&str> {
+        self.alarms
+            .iter()
+            .find(|alarm| alarm.id == id)
+            .map(|alarm| alarm.label.as_str())
+    }
+
+    pub fn sync_systemd_timers(&self) -> Result<(), String> {
+        #[cfg(target_os = "linux")]
+        systemd::sync_all(&self.alarms)?;
+
+        Ok(())
+    }
+
     pub fn add(&mut self, hour: i32, minute: i32, label: String) -> Result<(), String> {
         if !(0..=23).contains(&hour) || !(0..=59).contains(&minute) {
             return Err("Please choose a valid time.".to_owned());
@@ -186,8 +200,9 @@ impl AlarmManager {
             last_fired_date: None,
         };
         self.next_id = self.next_id.saturating_add(1);
-        self.alarms.push(alarm);
-        self.save()
+        self.alarms.push(alarm.clone());
+        self.save()?;
+        sync_systemd_alarm(&alarm)
     }
 
     pub fn toggle(&mut self, index: usize, enabled: bool) -> Result<(), String> {
@@ -199,15 +214,18 @@ impl AlarmManager {
         if enabled {
             alarm.last_fired_date = None;
         }
-        self.save()
+        let alarm = alarm.clone();
+        self.save()?;
+        sync_systemd_alarm(&alarm)
     }
 
     pub fn remove(&mut self, index: usize) -> Result<(), String> {
         if index >= self.alarms.len() {
             return Err("The selected alarm no longer exists.".to_owned());
         }
-        self.alarms.remove(index);
-        self.save()
+        let removed = self.alarms.remove(index);
+        self.save()?;
+        remove_systemd_alarm(removed.id)
     }
 
     pub fn due_now(&mut self, now: DateTime<Local>) -> Vec<String> {
@@ -247,6 +265,274 @@ impl AlarmManager {
             .map_err(|error| format!("Could not write alarms: {error}"))?;
         fs::rename(&temporary, &path)
             .map_err(|error| format!("Could not finalize the alarms file: {error}"))?;
+        Ok(())
+    }
+}
+
+
+pub fn systemd_supported() -> bool {
+    cfg!(target_os = "linux")
+}
+
+fn sync_systemd_alarm(alarm: &Alarm) -> Result<(), String> {
+    #[cfg(target_os = "linux")]
+    {
+        return systemd::sync_alarm(alarm);
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = alarm;
+        Ok(())
+    }
+}
+
+fn remove_systemd_alarm(id: u64) -> Result<(), String> {
+    #[cfg(target_os = "linux")]
+    {
+        return systemd::remove_alarm(id);
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = id;
+        Ok(())
+    }
+}
+
+#[cfg(target_os = "linux")]
+mod systemd {
+    use super::Alarm;
+    use std::env;
+    use std::fs;
+    use std::path::{Path, PathBuf};
+    use zbus::blocking::{Connection, Proxy};
+
+    const SERVICE_PREFIX: &str = "ganbattea-alarm-";
+
+    fn unit_directory() -> Result<PathBuf, String> {
+        let home = env::var_os("HOME")
+            .map(PathBuf::from)
+            .ok_or_else(|| "Could not determine the home directory for systemd units.".to_owned())?;
+        Ok(home.join(".config").join("systemd").join("user"))
+    }
+
+    fn manager_proxy(connection: &Connection) -> Result<Proxy<'_>, String> {
+        Proxy::new(
+            connection,
+            "org.freedesktop.systemd1",
+            "/org/freedesktop/systemd1",
+            "org.freedesktop.systemd1.Manager",
+        )
+        .map_err(|error| format!("Could not access the systemd user manager: {error}"))
+    }
+
+    fn unit_names(id: u64) -> (String, String) {
+        let base = format!("{SERVICE_PREFIX}{id}");
+        (format!("{base}.service"), format!("{base}.timer"))
+    }
+
+    fn write_unit(directory: &Path, name: &str, contents: &str) -> Result<(), String> {
+        let path = directory.join(name);
+        let temporary = directory.join(format!(".{name}.{}.tmp", std::process::id()));
+        fs::write(&temporary, contents)
+            .map_err(|error| format!("Could not write systemd unit {name}: {error}"))?;
+        fs::rename(&temporary, &path)
+            .map_err(|error| format!("Could not install systemd unit {name}: {error}"))
+    }
+
+    fn systemd_quote(value: &str) -> String {
+        let escaped = value
+            .replace('\\', "\\\\")
+            .replace('"', "\\\"")
+            .replace('%', "%%")
+            .replace('
+    #[cfg(target_os = "windows")]
+    let base = env::var_os("APPDATA").map(PathBuf::from);
+
+    #[cfg(target_os = "macos")]
+    let base = env::var_os("HOME")
+        .map(PathBuf::from)
+        .map(|home| home.join("Library").join("Application Support"));
+
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let base = env::var_os("XDG_DATA_HOME")
+        .map(PathBuf::from)
+        .or_else(|| env::var_os("HOME").map(PathBuf::from).map(|home| home.join(".local").join("share")));
+
+    base.map(|directory| directory.join("Ganbattea").join("alarms.json"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn timer_counts_down_and_can_pause() {
+        let mut timer = CountdownTimer::default();
+        timer.set_seconds(90);
+        assert_eq!(timer.display(), "00:01:30");
+        assert!(timer.start());
+        std::thread::sleep(Duration::from_millis(30));
+        timer.pause();
+        assert!(!timer.is_running());
+        assert!(timer.remaining_ms() <= 90_000);
+        assert!(timer.remaining_ms() > 0);
+    }
+
+    #[test]
+    fn stopwatch_can_pause_and_resume() {
+        let mut stopwatch = Stopwatch::default();
+        stopwatch.start();
+        std::thread::sleep(Duration::from_millis(20));
+        stopwatch.pause();
+        let saved = stopwatch.elapsed();
+        std::thread::sleep(Duration::from_millis(10));
+        assert_eq!(stopwatch.elapsed(), saved);
+        stopwatch.start();
+        assert!(stopwatch.is_running());
+    }
+
+    #[test]
+    fn timer_display_formats_hours() {
+        let mut timer = CountdownTimer::default();
+        timer.set_seconds(3_661);
+        assert_eq!(timer.display(), "01:01:01");
+    }
+}
+, "\\x24");
+        format!("\"{escaped}\"")
+    }
+
+    fn service_contents(id: u64) -> Result<String, String> {
+        let launch_command = if env::var_os("FLATPAK_ID").is_some() {
+            "/usr/bin/flatpak run de.ganbattea.app".to_owned()
+        } else {
+            let executable = env::current_exe()
+                .map_err(|error| format!("Could not locate the Ganbattea executable: {error}"))?;
+            let executable = executable
+                .to_str()
+                .ok_or_else(|| "The Ganbattea executable path is not valid UTF-8.".to_owned())?;
+            systemd_quote(executable)
+        };
+
+        Ok(format!(
+            "[Unit]\nDescription=Launch Ganbattea for alarm {id}\n\n[Service]\nType=oneshot\nExecStart=/usr/bin/systemd-run --user --scope --no-block {launch_command} --alarm-trigger {id}\n"
+        ))
+    }
+
+    fn timer_contents(alarm: &Alarm, service_name: &str) -> String {
+        format!(
+            "[Unit]\nDescription=Daily Ganbattea alarm {}\n\n[Timer]\nOnCalendar=*-*-* {:02}:{:02}:00\nAccuracySec=1s\nPersistent=true\nUnit={}\n\n[Install]\nWantedBy=timers.target\n",
+            alarm.id, alarm.hour, alarm.minute, service_name
+        )
+    }
+
+    fn sync_with_proxy(
+        proxy: &Proxy<'_>,
+        directory: &Path,
+        alarm: &Alarm,
+    ) -> Result<(), String> {
+        let (service_name, timer_name) = unit_names(alarm.id);
+        let service_path = directory.join(&service_name);
+        let timer_path = directory.join(&timer_name);
+
+        if !alarm.enabled {
+            let _ = proxy.call_method("StopUnit", &(timer_name.as_str(), "replace"));
+            if timer_path.exists() {
+                proxy.call_method(
+                    "DisableUnitFiles",
+                    &(vec![timer_name.clone()], false),
+                )
+                .map_err(|error| format!("Could not disable systemd timer {timer_name}: {error}"))?;
+            }
+            if timer_path.exists() {
+                fs::remove_file(&timer_path)
+                    .map_err(|error| format!("Could not remove systemd timer {timer_name}: {error}"))?;
+            }
+            if service_path.exists() {
+                fs::remove_file(&service_path)
+                    .map_err(|error| format!("Could not remove systemd service {service_name}: {error}"))?;
+            }
+            proxy.call_method("Reload", &())
+                .map_err(|error| format!("Could not reload the systemd user manager: {error}"))?;
+            return Ok(());
+        }
+
+        write_unit(directory, &service_name, &service_contents(alarm.id)?)?;
+        write_unit(directory, &timer_name, &timer_contents(alarm, &service_name))?;
+
+        proxy.call_method("Reload", &())
+            .map_err(|error| format!("Could not reload the systemd user manager: {error}"))?;
+        proxy.call_method(
+            "EnableUnitFiles",
+            &(vec![timer_name.clone()], false, true),
+        )
+        .map_err(|error| format!("Could not enable systemd timer {timer_name}: {error}"))?;
+        proxy.call_method("StartUnit", &(timer_name.as_str(), "replace"))
+            .map_err(|error| format!("Could not start systemd timer {timer_name}: {error}"))?;
+
+        Ok(())
+    }
+
+    pub fn sync_all(alarms: &[Alarm]) -> Result<(), String> {
+        let directory = unit_directory()?;
+        fs::create_dir_all(&directory)
+            .map_err(|error| format!("Could not create the systemd user-unit directory: {error}"))?;
+
+        let connection = Connection::session()
+            .map_err(|error| format!("Could not connect to the systemd user manager: {error}"))?;
+        let proxy = manager_proxy(&connection)?;
+
+        for alarm in alarms {
+            sync_with_proxy(&proxy, &directory, alarm)?;
+        }
+
+        Ok(())
+    }
+
+    pub fn sync_alarm(alarm: &Alarm) -> Result<(), String> {
+        let directory = unit_directory()?;
+        fs::create_dir_all(&directory)
+            .map_err(|error| format!("Could not create the systemd user-unit directory: {error}"))?;
+
+        let connection = Connection::session()
+            .map_err(|error| format!("Could not connect to the systemd user manager: {error}"))?;
+        let proxy = manager_proxy(&connection)?;
+        sync_with_proxy(&proxy, &directory, alarm)
+    }
+
+    pub fn remove_alarm(id: u64) -> Result<(), String> {
+        let directory = unit_directory()?;
+        let (service_name, timer_name) = unit_names(id);
+        let service_path = directory.join(&service_name);
+        let timer_path = directory.join(&timer_name);
+
+        if !service_path.exists() && !timer_path.exists() {
+            return Ok(());
+        }
+
+        let connection = Connection::session()
+            .map_err(|error| format!("Could not connect to the systemd user manager: {error}"))?;
+        let proxy = manager_proxy(&connection)?;
+
+        let _ = proxy.call_method("StopUnit", &(timer_name.as_str(), "replace"));
+        if timer_path.exists() {
+            proxy.call_method(
+                "DisableUnitFiles",
+                &(vec![timer_name.clone()], false),
+            )
+            .map_err(|error| format!("Could not disable systemd timer {timer_name}: {error}"))?;
+            fs::remove_file(&timer_path)
+                .map_err(|error| format!("Could not remove systemd timer {timer_name}: {error}"))?;
+        }
+        if service_path.exists() {
+            fs::remove_file(&service_path)
+                .map_err(|error| format!("Could not remove systemd service {service_name}: {error}"))?;
+        }
+
+        proxy.call_method("Reload", &())
+            .map_err(|error| format!("Could not reload the systemd user manager: {error}"))?;
         Ok(())
     }
 }
