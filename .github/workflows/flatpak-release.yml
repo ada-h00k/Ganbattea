@@ -1,0 +1,280 @@
+name: Build and publish Flatpak
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    name: Find commits in this push
+    runs-on: ubuntu-24.04
+    outputs:
+      commits: ${{ steps.commits.outputs.matrix }}
+    steps:
+      - name: Check out pushed branch history
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Create commit matrix
+        id: commits
+        env:
+          EVENT_PATH: ${{ github.event_path }}
+          HEAD_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          mapfile -t pushed_commits < <(jq -r '.commits[]?.id' "$EVENT_PATH")
+          if [[ ${#pushed_commits[@]} -eq 0 ]]; then
+            pushed_commits=("$HEAD_SHA")
+          fi
+
+          matrix='[]'
+          for sha in "${pushed_commits[@]}"; do
+            # Only create builds for commits that already contain the Flatpak
+            # packaging and the AGPL metadata required by this workflow.
+            if ! git cat-file -e "${sha}:packaging/flatpak/de.ganbattea.app.yml" 2>/dev/null; then
+              echo "Skipping $sha: Flatpak manifest not present in this commit."
+              continue
+            fi
+            cargo_manifest="$RUNNER_TEMP/Cargo-${sha}.toml"
+            git show "${sha}:Cargo.toml" > "$cargo_manifest"
+            if ! grep -q 'license = "AGPL-3.0-only"' "$cargo_manifest"; then
+              echo "Skipping $sha: AGPL-3.0-only metadata not present in this commit."
+              continue
+            fi
+            is_tip=false
+            if [[ "$sha" == "$HEAD_SHA" ]]; then is_tip=true; fi
+            matrix="$(jq -c --arg sha "$sha" --argjson tip "$is_tip" '. + [{sha: $sha, is_tip: $tip}]' <<< "$matrix")"
+          done
+
+          if [[ "$matrix" == '[]' ]]; then
+            echo "No publishable commits were found in this push."
+            exit 1
+          fi
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
+  build-release:
+    name: Build and release ${{ matrix.commit.sha }}
+    needs: prepare
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        commit: ${{ fromJson(needs.prepare.outputs.commits) }}
+    permissions:
+      contents: write
+    env:
+      FLATPAK_GPG_PRIVATE_KEY: ${{ secrets.FLATPAK_GPG_PRIVATE_KEY }}
+      FLATPAK_GPG_KEY_ID: ${{ vars.FLATPAK_GPG_KEY_ID }}
+    steps:
+      - name: Check out this commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.commit.sha }}
+          fetch-depth: 1
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Flatpak build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes flatpak flatpak-builder ostree gpg python3-aiohttp python3-tomlkit
+          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+
+      - name: Generate Cargo lockfile when missing
+        run: |
+          if [ ! -f Cargo.lock ]; then
+            cargo generate-lockfile
+          fi
+
+      - name: Generate offline Cargo sources
+        run: |
+          git clone --depth 1 https://github.com/flatpak/flatpak-builder-tools.git "$RUNNER_TEMP/flatpak-builder-tools"
+          python3 "$RUNNER_TEMP/flatpak-builder-tools/cargo/flatpak-cargo-generator.py" \
+            Cargo.lock -o packaging/flatpak/cargo-sources.json
+
+      - name: Import optional Flatpak repository signing key
+        id: signing
+        shell: bash
+        run: |
+          if [[ -n "$FLATPAK_GPG_PRIVATE_KEY" && -n "$FLATPAK_GPG_KEY_ID" ]]; then
+            printf '%s' "$FLATPAK_GPG_PRIVATE_KEY" | gpg --batch --import
+            gpg --batch --list-secret-keys "$FLATPAK_GPG_KEY_ID" >/dev/null
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "No signing key configured; the Flatpak repository will be unsigned."
+          fi
+
+      - name: Build Flatpak and export OSTree repository
+        shell: bash
+        run: |
+          signing_args=()
+          if [[ "${{ steps.signing.outputs.enabled }}" == "true" ]]; then
+            signing_args+=(--gpg-sign="$FLATPAK_GPG_KEY_ID")
+          fi
+          flatpak-builder --user --install-deps-from=flathub \
+            --disable-rofiles-fuse --force-clean --collection-id=de.ganbattea.app --default-branch=stable \
+            "${signing_args[@]}" --repo=repo build-dir \
+            packaging/flatpak/de.ganbattea.app.yml
+          flatpak build-update-repo "${signing_args[@]}" \
+            --generate-static-deltas --prune repo
+
+      - name: Create Flatpak bundle and remote configuration
+        id: package
+        shell: bash
+        env:
+          COMMIT_SHA: ${{ matrix.commit.sha }}
+          OWNER: ${{ github.repository_owner }}
+          REPOSITORY: ${{ github.event.repository.name }}
+          SIGNING_ENABLED: ${{ steps.signing.outputs.enabled }}
+        run: |
+          mkdir -p dist site
+          bundle="Ganbattea-${COMMIT_SHA}.flatpak"
+          base_url="https://${OWNER}.github.io/${REPOSITORY}"
+          bundle_args=()
+          if [[ "$SIGNING_ENABLED" == "true" ]]; then
+            gpg --batch --export "$FLATPAK_GPG_KEY_ID" > dist/ganbattea-repo-public.gpg
+            bundle_args+=(--gpg-keys=dist/ganbattea-repo-public.gpg)
+          fi
+          flatpak build-bundle --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo \
+            "${bundle_args[@]}" repo "dist/$bundle" de.ganbattea.app stable
+
+          cat > "dist/Ganbattea-${COMMIT_SHA}.flatpakrepo" <<EOF_REPO
+          [Flatpak Repo]
+          Title=Ganbattea
+          Url=${base_url}/repo
+          DefaultBranch=stable
+          Homepage=https://github.com/${OWNER}/${REPOSITORY}
+          Comment=Ganbattea timer, stopwatch, and alarm clock
+          Description=Automated Flatpak repository for Ganbattea
+          EOF_REPO
+
+          if [[ "$SIGNING_ENABLED" == "true" ]]; then
+            public_key="$(gpg --batch --export "$FLATPAK_GPG_KEY_ID" | base64 -w0)"
+            printf 'GPGKey=%s\n' "$public_key" >> "dist/Ganbattea-${COMMIT_SHA}.flatpakrepo"
+          fi
+
+          echo "bundle=$bundle" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub release for this commit
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: commit-${{ matrix.commit.sha }}
+          target_commitish: ${{ matrix.commit.sha }}
+          name: Ganbattea build ${{ matrix.commit.sha }}
+          prerelease: true
+          make_latest: false
+          generate_release_notes: false
+          body: |
+            Automated Flatpak build for commit `${{ matrix.commit.sha }}`.
+
+            - Flatpak bundle: install the attached `.flatpak` file with `flatpak install --user ./FILE.flatpak`.
+            - Flatpak repository: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+          files: |
+            dist/Ganbattea-${{ matrix.commit.sha }}.flatpak
+            dist/Ganbattea-${{ matrix.commit.sha }}.flatpakrepo
+
+      - name: Prepare GitHub Pages Flatpak repository for the pushed HEAD
+        if: matrix.commit.is_tip
+        shell: bash
+        env:
+          HEAD_SHA: ${{ github.sha }}
+          OWNER: ${{ github.repository_owner }}
+          REPOSITORY: ${{ github.event.repository.name }}
+          SIGNING_ENABLED: ${{ steps.signing.outputs.enabled }}
+        run: |
+          mkdir -p site/repo
+          touch site/.nojekyll
+          cp -a repo/. site/repo/
+          cp "dist/Ganbattea-${{ matrix.commit.sha }}.flatpakrepo" site/ganbattea.flatpakrepo
+
+          base_url="https://${OWNER}.github.io/${REPOSITORY}"
+          if [[ "$SIGNING_ENABLED" == "true" ]]; then
+            install_command="flatpak remote-add --user --if-not-exists ganbattea ${base_url}/ganbattea.flatpakrepo"
+          else
+            install_command="flatpak remote-add --user --if-not-exists --no-gpg-verify ganbattea ${base_url}/repo"
+          fi
+
+          cat > site/index.html <<EOF_HTML
+          <!doctype html>
+          <html lang="en">
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>Ganbattea Flatpak Repository</title>
+            <style>
+              body { max-width: 760px; margin: 4rem auto; padding: 0 1.25rem; font: 16px/1.6 system-ui, sans-serif; color: #e9f0fa; background: #101a2b; }
+              h1 { color: #9be7d8; } code, pre { background: #1b2a40; border-radius: 8px; }
+              pre { padding: 1rem; overflow-wrap: anywhere; white-space: pre-wrap; }
+              a { color: #9be7d8; }
+            </style>
+          </head>
+          <body>
+            <h1>Ganbattea</h1>
+            <p>Flatpak repository for the Ganbattea timer, stopwatch, and alarm clock.</p>
+            <h2>Install</h2>
+            <p>Run these commands on a Linux system with Flatpak installed:</p>
+            <pre>${install_command}
+          flatpak install --user ganbattea de.ganbattea.app
+          flatpak run de.ganbattea.app</pre>
+            <p>Repository commit: <code>${HEAD_SHA}</code></p>
+            <p><a href="https://github.com/${OWNER}/${REPOSITORY}/releases">Download a commit bundle</a> · <a href="https://github.com/${OWNER}/${REPOSITORY}">Source code</a></p>
+            <p>License: GNU AGPL version 3 only.</p>
+          </body>
+          </html>
+          EOF_HTML
+
+      - name: Upload GitHub Pages artifact
+        if: matrix.commit.is_tip
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy-pages:
+    name: Deploy Flatpak repository to GitHub Pages
+    needs: build-release
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    concurrency:
+      group: github-pages-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - name: Check whether this run still represents the branch HEAD
+        id: current
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 1
+
+      - name: Skip stale Pages deployments
+        id: freshness
+        shell: bash
+        run: |
+          checked_out_sha="$(git rev-parse HEAD)"
+          if [[ "$checked_out_sha" == "${{ github.sha }}" ]]; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping stale Pages deployment; branch HEAD is $checked_out_sha."
+          fi
+
+      - name: Deploy GitHub Pages
+        id: deployment
+        if: steps.freshness.outputs.publish == 'true'
+        uses: actions/deploy-pages@v4

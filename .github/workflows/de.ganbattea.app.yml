@@ -1,0 +1,35 @@
+id: de.ganbattea.app
+runtime: org.kde.Platform
+runtime-version: '6.11'
+sdk: org.kde.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+command: ganbattea
+default-branch: stable
+finish-args:
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+  - --socket=pulseaudio
+modules:
+  - name: ganbattea
+    buildsystem: simple
+    build-options:
+      append-path: /usr/lib/sdk/rust-stable/bin
+      env:
+        CARGO_HOME: /run/build/ganbattea/cargo
+        CARGO_NET_OFFLINE: 'true'
+        QMAKE: /usr/lib/qt6/bin/qmake
+    build-commands:
+      - cargo --offline fetch --manifest-path Cargo.toml --verbose
+      - cargo build --offline --release --locked
+      - install -Dm0755 target/release/ganbattea /app/bin/ganbattea
+      - install -Dm0644 packaging/flatpak/de.ganbattea.app.desktop /app/share/applications/de.ganbattea.app.desktop
+      - install -Dm0644 packaging/flatpak/de.ganbattea.app.svg /app/share/icons/hicolor/scalable/apps/de.ganbattea.app.svg
+      - install -Dm0644 packaging/flatpak/de.ganbattea.app.metainfo.xml /app/share/metainfo/de.ganbattea.app.metainfo.xml
+      - install -Dm0644 LICENSE /app/share/licenses/de.ganbattea.app/LICENSE
+    sources:
+      - cargo-sources.json
+      - type: dir
+        path: ../..
