@@ -167,6 +167,7 @@ jobs:
           echo "bundle=$bundle" >> "$GITHUB_OUTPUT"
 
       - name: Create draft GitHub release and upload assets
+        id: release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: commit-${{ matrix.commit.sha }}
@@ -188,13 +189,20 @@ jobs:
       - name: Publish pre-release after all assets are uploaded
         uses: actions/github-script@v7
         env:
-          RELEASE_TAG: commit-${{ matrix.commit.sha }}
+          RELEASE_ID: ${{ steps.release.outputs.id }}
         with:
           script: |
-            const { data: release } = await github.rest.repos.getReleaseByTag({
+            const releaseId = Number(process.env.RELEASE_ID);
+            if (!Number.isSafeInteger(releaseId) || releaseId <= 0) {
+              throw new Error(`Invalid release ID from the draft creation step: ${process.env.RELEASE_ID}`);
+            }
+
+            // Draft releases are not returned by GitHub's getReleaseByTag endpoint.
+            // Use the release ID returned by softprops/action-gh-release instead.
+            const { data: release } = await github.rest.repos.getRelease({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              tag: process.env.RELEASE_TAG,
+              release_id: releaseId,
             });
 
             if (!release.draft) {
@@ -205,7 +213,7 @@ jobs:
             const { data: published } = await github.rest.repos.updateRelease({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              release_id: release.id,
+              release_id: releaseId,
               draft: false,
               prerelease: true,
             });
