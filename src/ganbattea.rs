@@ -139,10 +139,10 @@ impl qobject::Ganbattea {
         self.as_mut().refresh_timer();
         self.as_mut().refresh_stopwatch();
         if finished {
-            self.set_status_message(QString::from("Zeit abgelaufen!"));
+            self.as_mut().set_status_message(QString::from("Zeit abgelaufen!"));
             let event = *self.alarm_event() + 1;
-            self.set_alarm_event(event);
-            self.set_alarm_event_text(QString::from("Dein Timer ist abgelaufen."));
+            self.as_mut().set_alarm_event(event);
+            self.as_mut().set_alarm_event_text(QString::from("Dein Timer ist abgelaufen."));
         }
     }
 
@@ -159,7 +159,7 @@ impl qobject::Ganbattea {
     }
 
     pub fn reset_stopwatch(mut self: Pin<&mut Self>) {
-        let rust = self.as_mut().rust_mut();
+        let mut rust = self.as_mut().rust_mut();
         rust.stopwatch.reset();
         rust.stopwatch_laps.clear();
         self.as_mut().set_stopwatch_laps_json(QString::from("[]"));
@@ -169,7 +169,7 @@ impl qobject::Ganbattea {
 
     pub fn lap_stopwatch(mut self: Pin<&mut Self>) {
         let json = {
-            let rust = self.as_mut().rust_mut();
+            let mut rust = self.as_mut().rust_mut();
             let lap = rust.stopwatch.display();
             rust.stopwatch_laps.push(lap);
             serde_json::to_string(&rust.stopwatch_laps).unwrap_or_else(|_| "[]".to_owned())
