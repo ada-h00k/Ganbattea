@@ -345,62 +345,7 @@ mod systemd {
         let escaped = value
             .replace('\\', "\\\\")
             .replace('"', "\\\"")
-            .replace('%', "%%")
-            .replace('
-    #[cfg(target_os = "windows")]
-    let base = env::var_os("APPDATA").map(PathBuf::from);
-
-    #[cfg(target_os = "macos")]
-    let base = env::var_os("HOME")
-        .map(PathBuf::from)
-        .map(|home| home.join("Library").join("Application Support"));
-
-    #[cfg(all(unix, not(target_os = "macos")))]
-    let base = env::var_os("XDG_DATA_HOME")
-        .map(PathBuf::from)
-        .or_else(|| env::var_os("HOME").map(PathBuf::from).map(|home| home.join(".local").join("share")));
-
-    base.map(|directory| directory.join("Ganbattea").join("alarms.json"))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn timer_counts_down_and_can_pause() {
-        let mut timer = CountdownTimer::default();
-        timer.set_seconds(90);
-        assert_eq!(timer.display(), "00:01:30");
-        assert!(timer.start());
-        std::thread::sleep(Duration::from_millis(30));
-        timer.pause();
-        assert!(!timer.is_running());
-        assert!(timer.remaining_ms() <= 90_000);
-        assert!(timer.remaining_ms() > 0);
-    }
-
-    #[test]
-    fn stopwatch_can_pause_and_resume() {
-        let mut stopwatch = Stopwatch::default();
-        stopwatch.start();
-        std::thread::sleep(Duration::from_millis(20));
-        stopwatch.pause();
-        let saved = stopwatch.elapsed();
-        std::thread::sleep(Duration::from_millis(10));
-        assert_eq!(stopwatch.elapsed(), saved);
-        stopwatch.start();
-        assert!(stopwatch.is_running());
-    }
-
-    #[test]
-    fn timer_display_formats_hours() {
-        let mut timer = CountdownTimer::default();
-        timer.set_seconds(3_661);
-        assert_eq!(timer.display(), "01:01:01");
-    }
-}
-, "\\x24");
+            .replace('%', "%%");
         format!("\"{escaped}\"")
     }
 
