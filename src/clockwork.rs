@@ -202,7 +202,7 @@ impl AlarmManager {
         self.next_id = self.next_id.saturating_add(1);
         self.alarms.push(alarm.clone());
         self.save()?;
-        sync_systemd_alarm(&alarm)
+        sync_systemd_alarm(&alarm).map_err(|error| format!("Alarm was saved, but its systemd timer could not be enabled: {error}"))
     }
 
     pub fn toggle(&mut self, index: usize, enabled: bool) -> Result<(), String> {
@@ -216,7 +216,7 @@ impl AlarmManager {
         }
         let alarm = alarm.clone();
         self.save()?;
-        sync_systemd_alarm(&alarm)
+        sync_systemd_alarm(&alarm).map_err(|error| format!("Alarm settings were saved, but its systemd timer could not be updated: {error}"))
     }
 
     pub fn remove(&mut self, index: usize) -> Result<(), String> {
@@ -225,7 +225,7 @@ impl AlarmManager {
         }
         let removed = self.alarms.remove(index);
         self.save()?;
-        remove_systemd_alarm(removed.id)
+        remove_systemd_alarm(removed.id).map_err(|error| format!("Alarm was deleted, but its systemd timer could not be removed: {error}"))
     }
 
     pub fn due_now(&mut self, now: DateTime<Local>) -> Vec<String> {

@@ -210,9 +210,7 @@ impl qobject::Ganbattea {
 
     pub fn add_alarm(mut self: Pin<&mut Self>, hour: i32, minute: i32, label: &QString) {
         let result = self.as_mut().rust_mut().alarms.add(hour, minute, label.to_string());
-        if result.is_err() {
-            self.as_mut().set_systemd_alarms_enabled(false);
-        }
+        self.as_mut().set_systemd_alarms_enabled(systemd_supported() && result.is_ok());
         let (json, message) = {
             let rust = self.as_mut().rust_mut();
             (
@@ -233,9 +231,7 @@ impl qobject::Ganbattea {
         } else {
             self.as_mut().rust_mut().alarms.toggle(index as usize, enabled)
         };
-        if result.is_err() {
-            self.as_mut().set_systemd_alarms_enabled(false);
-        }
+        self.as_mut().set_systemd_alarms_enabled(systemd_supported() && result.is_ok());
         self.as_mut().refresh_alarms();
         match result {
             Ok(()) => self.set_status_message(QString::from("Alarm updated.")),
@@ -249,9 +245,7 @@ impl qobject::Ganbattea {
         } else {
             self.as_mut().rust_mut().alarms.remove(index as usize)
         };
-        if result.is_err() {
-            self.as_mut().set_systemd_alarms_enabled(false);
-        }
+        self.as_mut().set_systemd_alarms_enabled(systemd_supported() && result.is_ok());
         self.as_mut().refresh_alarms();
         match result {
             Ok(()) => self.set_status_message(QString::from("Alarm deleted.")),
