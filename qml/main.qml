@@ -138,7 +138,7 @@ ApplicationWindow {
                     font.bold: true
                 }
                 Text {
-                    text: "ZEIT. FOKUS. FLOW."
+                    text: "TIME. FOCUS. FLOW."
                     color: "#8291AD"
                     font.pixelSize: 10
                     font.letterSpacing: 2.6
@@ -514,7 +514,7 @@ ApplicationWindow {
                         Layout.alignment: Qt.AlignHCenter
                     }
                     Text {
-                        text: controller.stopwatchRunning ? "STOPWATCH RUNNING" : "BEREIT"
+                        text: controller.stopwatchRunning ? "STOPWATCH RUNNING" : "READY"
                         color: controller.stopwatchRunning ? "#9BE7D8" : "#8190AA"
                         font.pixelSize: 10
                         font.bold: true
