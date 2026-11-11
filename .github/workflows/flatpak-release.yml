@@ -166,8 +166,30 @@ jobs:
 
           echo "bundle=$bundle" >> "$GITHUB_OUTPUT"
 
+      - name: Check whether this commit already has a published release
+        id: existing-release
+        uses: actions/github-script@v7
+        env:
+          TAG_NAME: commit-${{ matrix.commit.sha }}
+        with:
+          script: |
+            try {
+              const { data: release } = await github.rest.repos.getReleaseByTag({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tag: process.env.TAG_NAME,
+              });
+              core.setOutput('published', 'true');
+              core.info(`Release is already published and immutable: ${release.html_url}`);
+            } catch (error) {
+              if (error.status !== 404) throw error;
+              core.setOutput('published', 'false');
+              core.info(`No published release exists for ${process.env.TAG_NAME}; creating it.`);
+            }
+
       - name: Create draft GitHub release and upload assets
         id: release
+        if: steps.existing-release.outputs.published != 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: commit-${{ matrix.commit.sha }}
@@ -187,6 +209,7 @@ jobs:
             dist/Ganbattea-${{ matrix.commit.sha }}.flatpakrepo
 
       - name: Publish pre-release after all assets are uploaded
+        if: steps.existing-release.outputs.published != 'true'
         uses: actions/github-script@v7
         env:
           RELEASE_ID: ${{ steps.release.outputs.id }}
