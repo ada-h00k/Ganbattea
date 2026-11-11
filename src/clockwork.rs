@@ -362,7 +362,7 @@ mod systemd {
         };
 
         Ok(format!(
-            "[Unit]\nDescription=Launch Ganbattea for alarm {id}\n\n[Service]\nType=oneshot\nExecStart=/usr/bin/systemd-run --user --scope --no-block {launch_command} --alarm-trigger {id}\n"
+            "[Unit]\nDescription=Launch Ganbattea for alarm {id}\n\n[Service]\nType=oneshot\nExecStart=/usr/bin/systemd-run --user --no-block {launch_command} --alarm-trigger {id}\n"
         ))
     }
 
