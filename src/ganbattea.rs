@@ -100,7 +100,7 @@ fn alarm_trigger_id_from_args() -> Option<u64> {
 
 impl Default for GanbatteaRust {
     fn default() -> Self {
-        let alarms = AlarmManager::load();
+        let mut alarms = AlarmManager::load();
         let systemd_result = alarms.sync_systemd_timers();
         let systemd_alarms_enabled = systemd_supported() && systemd_result.is_ok();
         let status_message = match systemd_result {
@@ -108,12 +108,21 @@ impl Default for GanbatteaRust {
             Err(error) => format!("Systemd alarm scheduling unavailable: {error}"),
         };
         let alarm_trigger_id = alarm_trigger_id_from_args();
-        let alarm_event_text = alarm_trigger_id
-            .map(|id| {
-                let label = alarms.label_for_id(id).unwrap_or("Alarm");
-                format!("Time for: {label}")
-            })
-            .unwrap_or_default();
+        let due_alarm_labels = if alarm_trigger_id.is_some() {
+            alarms.due_now(Local::now())
+        } else {
+            Vec::new()
+        };
+        let alarm_event_text = if !due_alarm_labels.is_empty() {
+            format!("Time for: {}", due_alarm_labels.join(", "))
+        } else {
+            alarm_trigger_id
+                .map(|id| {
+                    let label = alarms.label_for_id(id).unwrap_or("Alarm");
+                    format!("Time for: {label}")
+                })
+                .unwrap_or_default()
+        };
         let alarms_json = serde_json::to_string(alarms.alarms()).unwrap_or_else(|_| "[]".to_owned());
 
         Self {

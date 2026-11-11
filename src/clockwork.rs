@@ -345,8 +345,13 @@ mod systemd {
         let escaped = value
             .replace('\\', "\\\\")
             .replace('"', "\\\"")
-            .replace('%', "%%");
+            .replace('%', "%%")
+            .replace('$', "$$");
         format!("\"{escaped}\"")
+    }
+
+    fn shell_quote(value: &str) -> String {
+        format!("'{}'", value.replace('\'', "'\\''"))
     }
 
     fn service_contents(id: u64) -> Result<String, String> {
@@ -358,11 +363,16 @@ mod systemd {
             let executable = executable
                 .to_str()
                 .ok_or_else(|| "The Ganbattea executable path is not valid UTF-8.".to_owned())?;
-            systemd_quote(executable)
+            shell_quote(executable)
         };
 
+        let script = format!(
+            "if /usr/bin/pgrep -u __GANBATTE_UID__ -x ganbattea >/dev/null 2>&1; then exit 0; fi; /usr/bin/systemd-run --user --no-block {launch_command} --alarm-trigger {id}"
+        );
+        let script = systemd_quote(&script).replace("__GANBATTE_UID__", "%U");
+
         Ok(format!(
-            "[Unit]\nDescription=Launch Ganbattea for alarm {id}\n\n[Service]\nType=oneshot\nExecStart=/usr/bin/systemd-run --user --no-block {launch_command} --alarm-trigger {id}\n"
+            "[Unit]\nDescription=Launch Ganbattea for alarm {id}\n\n[Service]\nType=oneshot\nExecStart=/bin/sh -c {script}\n"
         ))
     }
 

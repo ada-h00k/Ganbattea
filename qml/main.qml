@@ -41,7 +41,7 @@ ApplicationWindow {
         triggeredOnStart: true
         onTriggered: {
             root.currentTime = Qt.formatTime(new Date(), "HH:mm:ss")
-            if (!controller.systemdAlarmsEnabled && !controller.alarmLaunch)
+            if (!controller.alarmLaunch)
                 controller.checkAlarms()
         }
     }
@@ -65,6 +65,7 @@ ApplicationWindow {
         if (controller.alarmLaunch && controller.alarmEvent > 0) {
             alarmDialog.open()
             alarmSound.play()
+            controller.alarmLaunch = false
         }
     }
 
